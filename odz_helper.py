@@ -149,18 +149,18 @@ def to_range(arg):
 
 
 # FUNCS TO FIND ODZ:
-def apply_case(res, root, a_range_min, a_range_max, b_range_min, b_range_max) -> None:
+def apply_case(res, root, a_range_min, a_range_max, b_range_min, b_range_max, accurance) -> None:
     case = copy.deepcopy(root)
 
-    find_odz(case.lhs, a_range_min, a_range_max)
+    find_odz(case.lhs, a_range_min, a_range_max, accurance)
     
-    vars = find_odz(case.rhs, b_range_min, b_range_max)
+    vars = find_odz(case.rhs, b_range_min, b_range_max, accurance)
     for v in vars:
         tmp = copy.deepcopy(case)
         tmp.rhs = v
         res.append(tmp)
 
-def find_odz(root, range_min=-2**15, range_max=2**15-1):
+def find_odz(root, range_min=-2**15, range_max=2**15-1, accurance=2):
     res = []
     
     if root.with_minus:
@@ -173,11 +173,11 @@ def find_odz(root, range_min=-2**15, range_max=2**15-1):
     
     if root.op == '+':
         # Case 1
-        apply_case(res, root, range_min // 2, range_max // 2, range_min // 2, range_max // 2)
+        apply_case(res, root, range_min // 2, range_max // 2, range_min // 2, range_max // 2, accurance)
         # Case 2
-        # apply_case(res, root, range_min, (range_min + range_max) // 2, 0, (range_max - range_min) // 2)
+        apply_case(res, root, range_min, (range_min + range_max) // 2, 0, (range_max - range_min) // 2, accurance)
         # Case 3
-        # apply_case(res, root, 0, (range_max - range_min) // 2, range_min, (range_min + range_max) // 2)
+        apply_case(res, root, 0, (range_max - range_min) // 2, range_min, (range_min + range_max) // 2, accurance)
 
     
     if root.op in ('&', '|'):
@@ -187,13 +187,14 @@ def find_odz(root, range_min=-2**15, range_max=2**15-1):
         # Convert mask to possible args masks
         arg_masks = []
         for mask in masks:
-            arg_masks.extend(to_args(mask, root.op))
+            if mask.endswith('2' * accurance):
+                arg_masks.extend(to_args(mask, root.op))
         
         for args in arg_masks:
             l_range = to_range(args[0])
             r_range = to_range(args[1])
 
-            apply_case(res, root, l_range[0], l_range[1], r_range[0], r_range[1])
+            apply_case(res, root, l_range[0], l_range[1], r_range[0], r_range[1], accurance)
 
     return res
 
@@ -202,7 +203,7 @@ def main():
 
     expr = parse(input())
     
-    cases = find_odz(expr)
+    cases = find_odz(expr,accurance=8)
     for c in cases:
         clear_free_name()
         print_root(c, file=out)
