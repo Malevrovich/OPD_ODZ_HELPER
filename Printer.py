@@ -1,5 +1,5 @@
 import string
-from typing import FrozenSet
+import sys
 
 FREE_NAME_CNT = 0
 def clear_free_name():
@@ -11,32 +11,32 @@ def get_free_name():
     FREE_NAME_CNT += 1
     return string.ascii_uppercase[FREE_NAME_CNT - 1]
 
-def print_root(node) -> None:
+def print_root(node, file=sys.stdout) -> None:
     if node.lhs is None:
         if node.with_minus:
-            print('-', end='')
-        print(get_free_name(), end = '')
+            print('-', end='', file=file)
+        print(get_free_name(), end = '', file=file)
         return
 
     if node.lhs is not None:
-        print_root(node.lhs)
+        print_root(node.lhs, file=file)
 
     if node.op is not None:
-        print(' ', end='')
-        print(node.op, end=' ')
+        print(' ', end='', file=file)
+        print(node.op, end=' ', file=file)
 
     if node.rhs is not None:
         if node.rhs.lhs is not None:
-            print('(', end='')
-        print_root(node.rhs)
+            print('(', end='', file=file)
+        print_root(node.rhs, file=file)
     if node.rhs.lhs is not None:
-            print(')', end='')
+            print(')', end='',file=file)
 
-def print_case(node) -> None:
+def print_case(node, file=sys.stdout) -> None:
     if node.op is not None:
-        print_case(node.lhs)
-        print_case(node.rhs)
+        print_case(node.lhs, file=file)
+        print_case(node.rhs, file=file)
         return
     
-    print(f"{get_free_name()}: [{node.min};{node.max}]")
+    print(f"{get_free_name()}: [{node.min};{node.max}]", file=file)
     

@@ -1,11 +1,10 @@
 # Takes A + (B - (D | (E & (...))))
 import copy
-from Parser import parse, test_parse
-from Printer import print_root
-from Printer import print_case
-import Printer
+from Parser import parse
+from Printer import print_root, print_case, clear_free_name
+import Tests
 
-
+# FUNCS FOR LOGIC OPERATIONS 
 def invert(s):
     res = ''
     for i in s:
@@ -33,39 +32,27 @@ def rev_convert(s):
         res += 2**(15 - i) * int(s[i])
     return res
 
-def test_convert():
-    for x in range(-2**15, 2**15):
-        if(rev_convert(convert(x)) != x):
-            print("ERROR AT ", x)
-            print("CONVERT: ", convert(x))
-            print("REV_CONVERT: ", rev_convert(convert(x)))
-            return
-
-def apply_case(res, root, a_range_min, a_range_max, b_range_min, b_range_max) -> None:
-    case = copy.deepcopy(root)
-
-    find_odz(case.lhs, a_range_min, a_range_max)
-
-    if root.op == '-':
-        case.rhs.with_minus = not(case.rhs.with_minus)
-    
-    vars = find_odz(case.rhs, b_range_min, b_range_max)
-    for v in vars:
-        tmp = copy.deepcopy(case)
-        tmp.rhs = v
-        res.append(tmp)
-
 def to_mask(s):
     while len(s) < 16:
         s += '2'
     return s
 
 def get_logic_masks(range_min, range_max) -> list:
+    range_max = min(range_max, 2**15 - 1)
+    range_min = max(range_min, -2**15)
     res = []
+
+    if range_min == -2**15 and range_max == 2**15 - 1:
+        return ['2' * 16]
 
     if range_min * range_max < 0:
         res = get_logic_masks(range_min, -1)
         res.extend(get_logic_masks(0, range_max))
+        return res
+
+    if range_min != 0 and range_max == 0:
+        res = get_logic_masks(range_min, -1)
+        res.extend(get_logic_masks(0, 0))
         return res
 
     lower = convert(range_min - 1)
@@ -81,7 +68,7 @@ def get_logic_masks(range_min, range_max) -> list:
         i += 1
 
     # Case 0. Full match
-    if not lower.startswith(common) and not upper.startswith(common):
+    if (not lower.startswith(common) or range_min == -2**15) and (not upper.startswith(common) or range_max == 2**15 - 1):
         return [to_mask(common)]
 
 
@@ -115,41 +102,6 @@ def get_logic_masks(range_min, range_max) -> list:
 
     return res
 
-def test_mask(expected, ans):
-    if sorted(expected) != sorted(ans):
-        print("ERROR TEST GET MASKS")
-        print(ans, ", but expected ", expected, sep='')
-        exit(-1)
-
-def test_get_masks():
-    class first_test:
-        expected = ['1111111111101222', '1111111111100112', '1111111111100101', '1111111111110022', '1111111111110102']
-        test_mask(expected, get_logic_masks(-27, -11))
-    
-    class second_test:
-        expected = ['1111111111102222', '1111111111110222']
-        test_mask(expected, get_logic_masks(-32, -9))
-
-    class third_test:
-        expected = ['1111111111110111']
-        test_mask(expected, get_logic_masks(-9, -9))
-    
-    class fourth_test:
-        expected = ['1111111111111222']
-        test_mask(expected, get_logic_masks(-8, -1))
-    
-    class fifth_test:
-        expected = ['1111111111111222', '0000000000000222', '0000000000001022', '0000000000001102']
-        test_mask(expected, get_logic_masks(-8, 13))
-
-    class sixth_test:
-        expected = ['1000000000000022', '1000000000000102']
-        test_mask(expected, get_logic_masks(-2**15, -32763))
-
-    class seventh_test:
-        expected = ['0111111111011122', '0111111111011012', '0111111111122222']
-        test_mask(expected, get_logic_masks(32730, 2**15 - 1))
-
 def to_args(mask, op, cur_lhs='', cur_rhs='') -> list:
     res = []
     if len(cur_lhs) == 16:
@@ -160,14 +112,16 @@ def to_args(mask, op, cur_lhs='', cur_rhs='') -> list:
             res.extend(to_args(mask, op, cur_lhs + '1', cur_rhs + '1'))
         
         if op == '|':
-            res.extend(to_args(mask, op, cur_lhs + '0', cur_rhs + '1'))
-            res.extend(to_args(mask, op, cur_lhs + '1', cur_rhs + '0'))
+            # Uncomment for more accurate result (It will slow program)
+            # res.extend(to_args(mask, op, cur_lhs + '0', cur_rhs + '1'))
+            # res.extend(to_args(mask, op, cur_lhs + '1', cur_rhs + '0'))
             res.extend(to_args(mask, op, cur_lhs + '1', cur_rhs + '1'))
     
     if mask[len(cur_lhs)] == '0':
         if op == '&':
-            res.extend(to_args(mask, op, cur_lhs + '1', cur_rhs + '0'))
-            res.extend(to_args(mask, op, cur_lhs + '0', cur_rhs + '1'))
+            # Uncomment for more accurate result (It will slow program)
+            # res.extend(to_args(mask, op, cur_lhs + '1', cur_rhs + '0'))
+            # res.extend(to_args(mask, op, cur_lhs + '0', cur_rhs + '1'))
             res.extend(to_args(mask, op, cur_lhs + '0', cur_rhs + '0'))
         
         if op == '|':
@@ -178,13 +132,10 @@ def to_args(mask, op, cur_lhs='', cur_rhs='') -> list:
 
     return res
 
-def test_to_args():
-    while True:
-        args = to_args(input().replace(' ', ''), input())
-        for arg in args:
-            print(*arg)
-
 def to_range(arg):
+    if arg[0] == '2':
+        return -2**15, 2**15 - 1
+
     mn = -2**15 * int(arg[0])
     mx = -2**15 * int(arg[0])
     for i in range(1, 16):
@@ -196,9 +147,18 @@ def to_range(arg):
             mx += 2**(15 - i)
     return mn, mx    
 
-def test_to_range():
-    while True:
-        print(to_range(input().replace(' ', '')))
+
+# FUNCS TO FIND ODZ:
+def apply_case(res, root, a_range_min, a_range_max, b_range_min, b_range_max) -> None:
+    case = copy.deepcopy(root)
+
+    find_odz(case.lhs, a_range_min, a_range_max)
+    
+    vars = find_odz(case.rhs, b_range_min, b_range_max)
+    for v in vars:
+        tmp = copy.deepcopy(case)
+        tmp.rhs = v
+        res.append(tmp)
 
 def find_odz(root, range_min=-2**15, range_max=2**15-1):
     res = []
@@ -211,19 +171,18 @@ def find_odz(root, range_min=-2**15, range_max=2**15-1):
         root.max = range_max
         return [root]
     
-    if root.op in ('+', '-'):
+    if root.op == '+':
         # Case 1
         apply_case(res, root, range_min // 2, range_max // 2, range_min // 2, range_max // 2)
         # Case 2
-        apply_case(res, root, range_min, (range_min + range_max) // 2, 0, (range_max - range_min) // 2)
+        # apply_case(res, root, range_min, (range_min + range_max) // 2, 0, (range_max - range_min) // 2)
         # Case 3
-        apply_case(res, root, 0, (range_max - range_min) // 2, range_min, (range_min + range_max) // 2)
+        # apply_case(res, root, 0, (range_max - range_min) // 2, range_min, (range_min + range_max) // 2)
 
     
     if root.op in ('&', '|'):
         # get possible results masks
         masks = get_logic_masks(range_min, range_max)
-        print(f"logic mask for [{range_min};{range_max}] is {masks}")
 
         # Convert mask to possible args masks
         arg_masks = []
@@ -239,27 +198,31 @@ def find_odz(root, range_min=-2**15, range_max=2**15-1):
     return res
 
 def main():
+    out = open("odz.txt", 'w+')
+
     expr = parse(input())
     
     cases = find_odz(expr)
     for c in cases:
-        Printer.clear_free_name()
-        print_root(c)
-        print()
+        clear_free_name()
+        print_root(c, file=out)
+        print('', file=out)
 
 
-        Printer.clear_free_name()
-        print_case(c)
-        print()
-
-
-def test_odz():
-    expr = parse(input())
-
-    cases = find_odz(expr)
-
+        clear_free_name()
+        print_case(c, file=out)
+        print('', file=out)
+    print("testing cur odz...")
+    Tests.test_odz(expr, cases)
+    print("odz is correct")
 
 if __name__ == '__main__':
-    test_get_masks()
-    test_convert()
+    # MY FUNC: H & (L + (D | (-G - (B & (F + (C & (-A - (E & K)...)
+    Tests.test_get_masks()
+    print("Get mask tests success")
+    Tests.test_convert()
+    print("Convert tests success")
+    # test_calc()
+    # Tests.test_find_odz()
+    print("Find odz tests success")
     main()

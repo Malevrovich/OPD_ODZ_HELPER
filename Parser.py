@@ -5,7 +5,7 @@ class Node:
         self.lhs = None # Node expected
         self.rhs = None # Node expected
 
-        self.min = -2*15
+        self.min = -2**15
         self.max = 2**15 - 1
 
         self.with_minus = False
@@ -43,6 +43,13 @@ def parse(s) -> Node:
         node.rhs = parse(s)
     else:
         node.rhs = Node()
+
+    if s[0] == '-':
+        node.rhs.with_minus = True
+
+    if node.op == '-':
+        node.op = '+'
+        node.rhs.with_minus = not(node.rhs.with_minus)
 
     return node   
 
